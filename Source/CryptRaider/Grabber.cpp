@@ -4,6 +4,7 @@
 
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
+#include "PhysicsEngine/PhysicsHandleComponent.h"
 
 // Sets default values for this component's properties
 UGrabber::UGrabber() {
@@ -17,30 +18,88 @@ UGrabber::UGrabber() {
 // Called when the game starts
 void UGrabber::BeginPlay() {
     Super::BeginPlay();
-
-    float Damage = 5;
-    if (HasDamage(Damage)) {
-        PrintDamage(Damage);
-    }
 }
 
 // Called every frame
 void UGrabber::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-    FVector Start = GetComponentLocation();
-    FVector End = Start + GetForwardVector() * MaxGrabDistance;
-    DrawDebugLine(GetWorld(), Start, End, FColor::Red);
-    
-}
-
-void UGrabber::PrintDamage(const float& Damage) {
-    UE_LOG(LogTemp, Display, TEXT("Damage: %f"), Damage);
-}
-
-bool UGrabber::HasDamage(float& OutDamage) {
-    if (OutDamage != 0) {
-        return true;
+    UPhysicsHandleComponent* PhysicsHandle = GetPhysicsHandle();
+    if (PhysicsHandle == nullptr) {
+        UE_LOG(LogTemp, Warning, TEXT("Physics Handle pointer is null."));
+        return;
     }
-    return false;
+
+    if (PhysicsHandle->GetGrabbedComponent() != nullptr) {
+        FVector TargetLocation = GetComponentLocation() + GetForwardVector() * HoldDistance;
+
+        PhysicsHandle->SetTargetLocationAndRotation(TargetLocation, GetComponentRotation());
+    }
+}
+
+bool UGrabber::GetGrabbableInReach(FHitResult& OutHitResult) const {
+    FVector Start = GetComponentLocation() + FVector(0, 0, 25);
+    FVector End = Start + GetForwardVector() * MaxGrabDistance;
+
+    FCollisionShape Sphere = FCollisionShape::MakeSphere(GrabRadius);
+    return GetWorld()->SweepSingleByChannel(
+        OutHitResult,
+        Start,
+        End,
+        FQuat::Identity,
+        ECC_GameTraceChannel2,
+        Sphere
+    );
+}
+
+void UGrabber::Grab() {
+    UPhysicsHandleComponent* PhysicsHandle = GetPhysicsHandle();
+
+    if (PhysicsHandle == nullptr) {
+        UE_LOG(LogTemp, Warning, TEXT("Physics Handle pointer is null."));
+        return;
+    }
+
+    FHitResult HitResult;
+    bool HasHit = GetGrabbableInReach(HitResult);
+
+    if (HasHit) {
+        UPrimitiveComponent* HitComponent = HitResult.GetComponent();
+        
+        HitComponent->WakeAllRigidBodies();
+        
+        PhysicsHandle->GrabComponentAtLocationWithRotation(
+            HitComponent,
+            NAME_None,
+            HitResult.ImpactPoint,
+            HitResult.GetComponent()->GetComponentRotation()
+        );
+    }
+}
+
+void UGrabber::Release() {
+    UPhysicsHandleComponent* PhysicsHandle = GetPhysicsHandle();
+
+    if (PhysicsHandle == nullptr) {
+        UE_LOG(LogTemp, Warning, TEXT("Physics Handle pointer is null."));
+        return;
+    }
+
+    UPrimitiveComponent* GrabbedComponent = PhysicsHandle->GetGrabbedComponent();
+
+    if (GrabbedComponent != nullptr) {
+        GrabbedComponent->WakeAllRigidBodies();
+        PhysicsHandle->ReleaseComponent();
+    }
+
+    UE_LOG(LogTemp, Display, TEXT("Released grabber"));
+}
+
+
+UPhysicsHandleComponent* UGrabber::GetPhysicsHandle() const {
+	UPhysicsHandleComponent* Result = GetOwner()->FindComponentByClass<UPhysicsHandleComponent>();
+	if (Result == nullptr) 	{
+		UE_LOG(LogTemp, Error, TEXT("Grabber requires a UPhysicsHandleComponent."));
+	}
+	return Result;
 }
