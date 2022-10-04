@@ -35,5 +35,5 @@ private:
 	bool ShouldMove = false;
 	FVector OriginalLocation;
 
-	void Move(float DeltaTime);
+	void Move(float DeltaTime, FVector TargetLocation);
 };
