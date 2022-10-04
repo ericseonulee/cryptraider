@@ -91,8 +91,6 @@ void UGrabber::Release() {
         GrabbedComponent->WakeAllRigidBodies();
         PhysicsHandle->ReleaseComponent();
     }
-
-    UE_LOG(LogTemp, Display, TEXT("Released grabber"));
 }
 
 

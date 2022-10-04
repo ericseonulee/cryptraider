@@ -22,15 +22,40 @@ void UTriggerComponent::BeginPlay() {
 void UTriggerComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
+    if (Mover == nullptr) {
+        return;
+    }
+
+    AActor* Actor = GetAcceptableActor();
+
+    if (Actor != nullptr) {
+        UPrimitiveComponent* Component = Cast<UPrimitiveComponent>(Actor->GetRootComponent());
+        if (Component != nullptr) {
+            Component->SetSimulatePhysics(false);
+        }
+        Actor->AttachToComponent(this, FAttachmentTransformRules::KeepWorldTransform);
+        Mover->SetShouldMove(true);
+    }
+    else {
+        Mover->SetShouldMove(false);
+    }
+}
+
+void UTriggerComponent::SetMover(UMover* NewMover) {
+    Mover = NewMover;
+}
+
+
+AActor* UTriggerComponent::GetAcceptableActor() const {
     TArray<AActor*> Actors;
 
     GetOverlappingActors(Actors);
 
     for (AActor* Actor : Actors) {
         if (Actor->ActorHasTag(AcceptableActorTag)) {
-            FString ActorName = Actor->GetActorNameOrLabel();
-
-            UE_LOG(LogTemp, Display, TEXT("unlocking"));
+            return Actor;
         }
     }
+
+    return nullptr;
 }
